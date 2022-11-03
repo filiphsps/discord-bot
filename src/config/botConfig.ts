@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-type BotConfig = {
+export type BotConfig = {
     production: boolean;
     excludedRepositories: string[];
 };

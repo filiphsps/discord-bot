@@ -5,76 +5,88 @@
  */
 
 import Discord, { Intents, Interaction } from "discord.js";
+
 import CommandHandler from "./commandHandler";
-import config from "./config/botConfig";
 import { DISCORD_TOKEN } from "./config/secrets";
+import StoreHandler from "./storeHandler";
 
-process.on("unhandledRejection", reason => {
-    console.log("Unhandled Rejection:", reason);
-});
+export interface Handlers {
+    storeHandler: StoreHandler;
+}
 
-const client = new Discord.Client({
-    intents: [
-        Intents.FLAGS.GUILDS,
-        Intents.FLAGS.GUILD_MESSAGES,
-        Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS,
-    ],
-    partials: ["MESSAGE", "CHANNEL", "REACTION"],
-});
+export const Bot = () =>
+    // eslint-disable-next-line no-async-promise-executor
+    new Promise(async () => {
+        // FIXME: add a way to gracefully shutdown the bot
 
-const commandHandler = new CommandHandler(config.production);
-
-client.on("ready", () => {
-    if (client.user != null) {
-        console.log(`Logged in as ${client.user.tag}.`);
-        client.user.setPresence({
-            status: "online",
-            activities: [
-                {
-                    type: "PLAYING",
-                    name: "Type /help to list commands.",
-                },
+        const client = new Discord.Client({
+            intents: [
+                Intents.FLAGS.GUILDS,
+                Intents.FLAGS.GUILD_MESSAGES,
+                Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS,
             ],
+            partials: ["MESSAGE", "CHANNEL", "REACTION"],
         });
 
-        commandHandler.registerInteractions(client);
-    }
-});
-client.on("interactionCreate", async (interaction: Interaction) => {
-    if (interaction.user.bot) return;
+        const storeHandler = new StoreHandler();
+        await storeHandler.initialize();
+        const commandHandler = new CommandHandler({
+            storeHandler,
+        });
+        await commandHandler.initialize();
 
-    if (interaction.isCommand() || interaction.isContextMenu())
-        commandHandler.handleBaseCommandInteraction(interaction);
+        client.on("ready", () => {
+            if (client.user != null) {
+                console.log(`Logged in as ${client.user.tag}.`);
+                client.user.setPresence({
+                    status: "online",
+                    activities: [
+                        {
+                            type: "PLAYING",
+                            name: "Type /help to list commands.",
+                        },
+                    ],
+                });
 
-    if (interaction.isButton()) commandHandler.handleButtonInteraction(interaction);
+                commandHandler.registerInteractions(client);
+            }
+        });
+        client.on("interactionCreate", async (interaction: Interaction) => {
+            if (interaction.user.bot) return;
 
-    if (interaction.isSelectMenu()) commandHandler.handleSelectInteraction(interaction);
-});
-client.on("error", e => {
-    console.error("Discord client error!", e);
-});
-client.on("messageCreate", async message => {
-    if (message.author.bot) return;
+            if (interaction.isCommand() || interaction.isContextMenu())
+                commandHandler.handleBaseCommandInteraction(interaction);
 
-    message = await message.fetch();
+            if (interaction.isButton()) commandHandler.handleButtonInteraction(interaction);
 
-    for (const embed of message.embeds) {
-        if (!embed.url) continue;
+            if (interaction.isSelectMenu()) commandHandler.handleSelectInteraction(interaction);
+        });
+        client.on("error", e => {
+            console.error("Discord client error!", e);
+        });
+        client.on("messageCreate", async message => {
+            if (message.author.bot) return;
 
-        const url = new URL(embed.url);
-        if (url.host !== "github.com") continue;
+            message = await message.fetch();
 
-        // eg.: embed.url: "https://github.com/SerenityOS/serenity/blob/master/AK/AllOf.h"
-        //      url.pathname: "/SerenityOS/serenity/blob/master/AK/AllOf.h"
-        //      segments: ["", "SerenityOS", "serenity", "blob", "master", "AK", "AllOf.h"]
-        //      githubUrlType: "blob"
-        const segments = url.pathname.split("/");
-        const githubUrlType: string | undefined = segments[3];
-        if (githubUrlType === "tree" || githubUrlType === "blob") {
-            await message.suppressEmbeds();
-            return;
-        }
-    }
-});
+            for (const embed of message.embeds) {
+                if (!embed.url) continue;
 
-client.login(DISCORD_TOKEN);
+                const url = new URL(embed.url);
+                if (url.host !== "github.com") continue;
+
+                // eg.: embed.url: "https://github.com/SerenityOS/serenity/blob/master/AK/AllOf.h"
+                //      url.pathname: "/SerenityOS/serenity/blob/master/AK/AllOf.h"
+                //      segments: ["", "SerenityOS", "serenity", "blob", "master", "AK", "AllOf.h"]
+                //      githubUrlType: "blob"
+                const segments = url.pathname.split("/");
+                const githubUrlType: string | undefined = segments[3];
+                if (githubUrlType === "tree" || githubUrlType === "blob") {
+                    await message.suppressEmbeds();
+                    return;
+                }
+            }
+        });
+
+        client.login(DISCORD_TOKEN);
+    });

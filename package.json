@@ -5,17 +5,17 @@
   "main": "index.js",
   "license": "BSD-2-Clause",
   "engines": {
-    "node": "16.x"
+    "node": ">=16.x"
   },
   "scripts": {
     "lint": "eslint . --ext .ts",
     "lint-and-fix": "eslint . --ext .ts --fix",
     "prestart:dev": "npm run build",
-    "start:dev": "nodemon build/index.js",
+    "start:dev": "nodemon build/bootstrap.js",
     "prebuild": "rimraf ./build",
     "build": "tsc",
     "prestart": "npm run build",
-    "start": "node build/index.js",
+    "start": "node build/bootstrap.js",
     "test": "mocha -r ts-node/register tests/**/*.test.ts"
   },
   "nodemonConfig": {
@@ -24,7 +24,7 @@
     ],
     "ext": ".ts,.js",
     "ignore": [],
-    "exec": "ts-node ./src/index.ts"
+    "exec": "ts-node ./src/bootstrap.ts"
   },
   "repository": {
     "type": "git",

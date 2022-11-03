@@ -9,11 +9,21 @@ import {
     ChatInputApplicationCommandData,
     CommandInteraction,
 } from "discord.js";
+import { Handlers } from "..";
 import githubAPI, { Commit, Repository } from "../apis/githubAPI";
 import config from "../config/botConfig";
+import { GitHubStore } from "../stores/githubStore";
 import Command from "./command";
 
 export class CommitStatsCommand extends Command {
+    private githubStore!: GitHubStore;
+
+    override async initialize(handlers: Handlers): Promise<void> {
+        console.log("!!!", this.constructor.name, handlers.storeHandler.constructor.name);
+        this.githubStore = handlers.storeHandler.get(GitHubStore);
+        console.log(this.githubStore.constructor.name);
+    }
+
     override data(): ChatInputApplicationCommandData | ChatInputApplicationCommandData[] {
         const description = "Show user's total amount of commits";
         const options: ApplicationCommandOptionData[] = [

@@ -12,7 +12,12 @@ import {
     SelectMenuInteraction,
 } from "discord.js";
 
+import type { Handlers } from "..";
+
 export default abstract class Command {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function, @typescript-eslint/no-unused-vars
+    initialize(_handlers: Handlers): Promise<void> | void {}
+
     /** Execute the command. */
     abstract handleCommand(interaction: CommandInteraction): Promise<void>;
 

@@ -30,6 +30,10 @@ export interface Repository {
     name: string;
 }
 
+export interface RepositoryData extends Repository {
+    html_url: string;
+}
+
 export interface Commit {
     html_url: string;
     sha: string;
@@ -254,13 +258,14 @@ class GithubAPI {
         return { pulls: userPulls, issues: userIssues };
     }
 
-    async fetchSerenityRepos(): Promise<Repository[]> {
+    async fetchSerenityRepos(): Promise<RepositoryData[]> {
         const results = await this.octokit.repos.listForOrg({
             org: SERENITY_REPOSITORY.owner,
         });
-        return results.data.map((repo: any) => ({
+        return results.data.map(repo => ({
             owner: repo.owner.login,
             name: repo.name,
+            html_url: repo.html_url,
         }));
     }
 }

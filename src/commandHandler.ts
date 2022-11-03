@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, the SerenityOS developers.
+ * Copyright (c) 2022, Filiph Sandström <filiph.sandstrom@filfatstudios.com>
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -21,15 +22,17 @@ import {
     Test262Command,
     UserCommand,
 } from "./commands";
+
 import Command from "./commands/command";
-import config from "./config/botConfig";
 import { GUILD_ID } from "./config/secrets";
+import type { Handlers } from ".";
+import config from "./config/botConfig";
 
 export default class CommandHandler {
     private readonly commands: Map<string[], Command>;
     private readonly help: string;
 
-    constructor(private readonly production: boolean) {
+    constructor(private readonly handlers: Handlers) {
         const commandClasses = [
             CommitStatsCommand,
             ManCommand,
@@ -62,6 +65,12 @@ export default class CommandHandler {
         this.help = "Available commands:\n" + availableCommands.join("\n");
     }
 
+    public async initialize() {
+        for (const [, command] of this.commands) {
+            if (command.initialize) await command.initialize(this.handlers);
+        }
+    }
+
     async registerInteractions(client: Client): Promise<void> {
         const commands = [
             ...Array.from(this.commands.values())
@@ -86,7 +95,7 @@ export default class CommandHandler {
 
     /** Executes user commands contained in a message if appropriate. */
     async handleBaseCommandInteraction(interaction: BaseCommandInteraction): Promise<void> {
-        if (!this.production) {
+        if (!config.production) {
             const msg = `Buggie bot received '${JSON.stringify(interaction, (_, v) =>
                 typeof v === "bigint" ? `${v.toString()}n` : v
             )} from '${interaction.user.tag}`;
