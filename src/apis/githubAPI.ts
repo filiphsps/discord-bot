@@ -30,6 +30,14 @@ export interface Repository {
     name: string;
 }
 
+export interface Commit {
+    html_url: string;
+    sha: string;
+    commit: {
+        message: string;
+    };
+}
+
 export const SERENITY_REPOSITORY = {
     owner: "SerenityOS",
     name: "serenity",
@@ -93,6 +101,40 @@ class GithubAPI {
                 pull_number: number,
             });
             return results.data;
+        } catch (e) {
+            console.trace(e);
+            return undefined;
+        }
+    }
+
+    async getCommits(author: string, limit = 5, repository: Repository = SERENITY_REPOSITORY) {
+        try {
+            const results = await this.octokit.repos.listCommits({
+                owner: repository.owner,
+                repo: repository.name,
+                author,
+                par_page: limit,
+            });
+            return results.data.slice(0, limit);
+        } catch (e) {
+            console.trace(e);
+            return undefined;
+        }
+    }
+
+    async getCommitsCount(author: string, repository: Repository = SERENITY_REPOSITORY) {
+        try {
+            const results = await this.octokit.paginate(
+                this.octokit.repos.listCommits,
+                {
+                    owner: repository.owner,
+                    repo: repository.name,
+                    author,
+                    per_page: 100,
+                },
+                res => res.data
+            );
+            return results.length;
         } catch (e) {
             console.trace(e);
             return undefined;
@@ -210,6 +252,16 @@ class GithubAPI {
         });
         if (issues.status === 200) userIssues = issues.data.items;
         return { pulls: userPulls, issues: userIssues };
+    }
+
+    async fetchSerenityRepos(): Promise<Repository[]> {
+        const results = await this.octokit.repos.listForOrg({
+            org: SERENITY_REPOSITORY.owner,
+        });
+        return results.data.map((repo: any) => ({
+            owner: repo.owner.login,
+            name: repo.name,
+        }));
     }
 }
 
