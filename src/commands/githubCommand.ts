@@ -17,7 +17,6 @@ import Command from "./command";
 
 const repositories: Array<{
     name: string;
-    urlRegex: RegExp;
     repository: Repository;
     defaultCategories?: Array<string>;
     defaultChannels?: Array<string>;
@@ -25,7 +24,6 @@ const repositories: Array<{
     {
         name: "serenity",
         repository: SERENITY_REPOSITORY,
-        urlRegex: /.+github.com\/SerenityOS\/serenity\/(?:issues|pull)\/(\d+).*/,
         defaultCategories: [
             // DEVELOPMENT
             "830526756619288616",
@@ -40,7 +38,6 @@ const repositories: Array<{
             owner: "SerenityOS",
             name: "jakt",
         },
-        urlRegex: /.+github.com\/SerenityOS\/jakt\/(?:issues|pull)\/(\d+).*/,
         defaultCategories: [
             // JAKT
             "976984132376744027",
@@ -52,7 +49,6 @@ const repositories: Array<{
             owner: "SerenityOS",
             name: "ladybird",
         },
-        urlRegex: /.+github.com\/SerenityOS\/ladybird\/(?:issues|pull)\/(\d+).*/,
         defaultChannels: [
             // #browser-qt
             "1022888574925947040",
@@ -115,18 +111,15 @@ export class GithubCommand extends Command {
 
         // When a url was specified, try all known regexes to find the referenced repository and issue / pull id
         if (url) {
-            for (const { repository, urlRegex } of repositories) {
-                const matches = url.match(urlRegex);
+            const deconstructedUrl = url.replace("https://github.com/", "").split("/");
+            const result = await embedFromIssueOrPull(
+                await githubAPI.getIssueOrPull(Number.parseInt(deconstructedUrl.at(-1)!, 10), {
+                    owner: deconstructedUrl[0],
+                    name: deconstructedUrl[1],
+                })
+            );
 
-                if (matches !== null) {
-                    const number = parseInt(matches[1]);
-                    const result = await embedFromIssueOrPull(
-                        await githubAPI.getIssueOrPull(number, repository)
-                    );
-
-                    if (result) return await interaction.reply({ embeds: [result] });
-                }
-            }
+            if (result) return await interaction.reply({ embeds: [result] });
         }
 
         let repository: Repository | undefined;
