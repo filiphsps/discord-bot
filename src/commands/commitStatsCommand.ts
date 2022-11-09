@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 import githubAPI, { Commit, Repository } from "../apis/githubAPI";
 import { CommitClubColor, GitHubColor } from "../util/color";
+import { createFailure, Either, isFailure, unwrapEither } from "../util/either";
 import { toMedal } from "../util/emoji";
 import { extractCopy, trimString } from "../util/text";
 import Command from "./command";
@@ -38,7 +39,9 @@ export class CommitStatsCommand extends Command {
         ];
     }
 
-    override async handleCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+    override async handleCommand(
+        interaction: ChatInputCommandInteraction
+    ): Promise<Either<Error, void>> {
         if (!interaction.isCommand()) return;
 
         const author = interaction.options.getString("author", true);
@@ -58,17 +61,22 @@ export class CommitStatsCommand extends Command {
         // FIXME: Don't try-catch everything; instead do it on a
         //        per - throwable function basis.
         try {
-            const user = await githubAPI.getUser(author);
-            if (!user) {
+            const userEither = await githubAPI.getUser(author);
+            if (isFailure(userEither)) {
                 await interaction.reply({
                     ephemeral: true,
                     content: `We looked everywhere; but we couldn't find \`${author}\` :^(`,
                 });
-                return;
+                return userEither;
             }
 
             await interaction.deferReply({ ephemeral: silent });
-            const repos = await githubAPI.fetchSerenityRepos();
+
+            const reposEither = await githubAPI.fetchSerenityRepos();
+            if (isFailure(reposEither)) return reposEither;
+
+            const user = unwrapEither(userEither);
+            const repos = unwrapEither(reposEither);
 
             // GitHub may return non-complete data for some people
             // when using either their username or their email (even
@@ -85,7 +93,7 @@ export class CommitStatsCommand extends Command {
 
             const userCommits = (
                 await Promise.all(
-                    repos.map<Promise<RepoInfo>>(async repo => {
+                    repos.map(async repo => {
                         const commits = await githubAPI.searchCommit(
                             undefined,
                             useEmail ? `author-email:${user.email}` : `author:${user.login}`,
@@ -166,13 +174,9 @@ export class CommitStatsCommand extends Command {
             await interaction.editReply({
                 embeds: [card],
             });
+            return;
         } catch (e) {
-            console.trace(e);
-            await interaction.editReply({
-                content: `Something went really wrong :^(\n\n\`\`\`${
-                    (e as Error)?.stack ?? e ?? ""
-                }\`\`\``,
-            });
+            return createFailure(e as Error);
         }
     }
 }

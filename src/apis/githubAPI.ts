@@ -5,9 +5,11 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+import { Either, createFailure, createSuccess } from "../util/either";
+import { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
+
 /* eslint camelcase: [2, { "properties": "never" }] */
 import { GITHUB_TOKEN } from "../config/secrets";
-import { Octokit } from "@octokit/rest";
 import { throttling as OctokitThrottling } from "@octokit/plugin-throttling";
 import { composeCreatePullRequest } from "octokit-plugin-create-pull-request";
 import config from "../config/botConfig";
@@ -114,7 +116,11 @@ class GithubAPI {
         }
     }
 
-    async getUser(author: string) {
+    async getUser(
+        author: string
+    ): Promise<
+        Either<Error, RestEndpointMethodTypes["users"]["getByUsername"]["response"]["data"]>
+    > {
         try {
             let username = author;
             if (author.includes("@")) {
@@ -124,7 +130,9 @@ class GithubAPI {
                 });
 
                 if (search.data.total_count <= 0)
-                    throw new Error(`A GitHub user with the primary email ${author} was not found`);
+                    return createFailure(
+                        new Error(`A GitHub user with the primary email ${author} was not found`)
+                    );
 
                 username = search.data.items[0].login;
             }
@@ -133,12 +141,9 @@ class GithubAPI {
                 username,
             });
 
-            return results.data;
-        } catch (e: any) {
-            if (e.status === 404) return null;
-
-            console.trace(e);
-            throw e;
+            return createSuccess(results.data);
+        } catch (e) {
+            return createFailure(e as Error);
         }
     }
 
@@ -290,16 +295,23 @@ class GithubAPI {
         return { pulls: userPulls, issues: userIssues };
     }
 
-    async fetchSerenityRepos(): Promise<Repository[]> {
-        const results = await this.octokit.repos.listForOrg({
-            org: SERENITY_REPOSITORY.owner,
-        });
-        return results.data
-            .map(repo => ({
-                owner: repo.owner.login,
-                name: repo.name,
-            }))
-            .filter(({ name }) => !config.excludedRepositories.includes(name));
+    async fetchSerenityRepos(): Promise<Either<Error, Repository[]>> {
+        try {
+            const results = await this.octokit.repos.listForOrg({
+                org: SERENITY_REPOSITORY.owner,
+            });
+
+            return createSuccess(
+                results.data
+                    .map(repo => ({
+                        owner: repo.owner.login,
+                        name: repo.name,
+                    }))
+                    .filter(({ name }) => !config.excludedRepositories.includes(name))
+            );
+        } catch (e) {
+            return createFailure(e as Error);
+        }
     }
 }
 

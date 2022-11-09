@@ -15,6 +15,7 @@ import {
     Interaction,
     SelectMenuInteraction,
 } from "discord.js";
+import { Either, createFailure } from "./util/either";
 
 import Command from "./commands/command";
 import { GUILD_ID } from "./config/secrets";
@@ -66,7 +67,7 @@ export default class CommandHandler {
     }
 
     /** Executes user commands contained in a message if appropriate. */
-    async handleCommandInteraction(interaction: Interaction): Promise<void> {
+    async handleCommandInteraction(interaction: Interaction): Promise<Either<Error, void>> {
         if (!this.production) {
             const msg = `Buggie bot received ${JSON.stringify(
                 interaction,
@@ -102,7 +103,7 @@ export default class CommandHandler {
                 ephemeral: true,
                 content: "I don't recognize that command.",
             });
-            return;
+            return createFailure(new Error("INVALID_COMMAND"));
         }
 
         if (
@@ -130,7 +131,9 @@ export default class CommandHandler {
         );
     }
 
-    async handleSelectInteraction(interaction: SelectMenuInteraction): Promise<void> {
+    async handleSelectInteraction(
+        interaction: SelectMenuInteraction
+    ): Promise<Either<Error, void>> {
         let matchedCommand;
 
         for (const [names, command] of this.commands.entries()) {
@@ -148,7 +151,7 @@ export default class CommandHandler {
                 ephemeral: true,
                 content: "I don't recognize that command.",
             });
-            return;
+            return createFailure(new Error("INVALID_COMMAND"));
         }
 
         if (matchedCommand.handleSelectMenu)
@@ -161,7 +164,7 @@ export default class CommandHandler {
         throw new Error(`${matchedCommand.constructor.name}: Missing handleSelectMenu handler`);
     }
 
-    async handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
+    async handleButtonInteraction(interaction: ButtonInteraction): Promise<Either<Error, void>> {
         for (const [, command] of this.commands.entries()) {
             if (!command.buttonData) continue;
 
@@ -184,12 +187,14 @@ export default class CommandHandler {
 
     private async callInteractionHandler<T>(
         command: Command,
-        handler: (interaction: T) => Promise<void>,
+        handler: (interaction: T) => Promise<Either<Error, void>>,
         interaction: T & { reply: CommandInteraction["reply"] }
-    ): Promise<void> {
+    ): Promise<Either<Error, void>> {
         return await handler.call(command, interaction).catch(error => {
             console.trace("matchedCommand.handle{Select|Context}Menu failed", error);
             interaction.reply({ ephemeral: true, content: `Failed because of ${error}` });
+
+            return createFailure(error as Error);
         });
     }
 }
