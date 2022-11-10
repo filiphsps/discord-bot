@@ -69,29 +69,6 @@ export class Buggie {
         this.client.on(Events.Error, e => {
             console.error("Discord client error!", e);
         });
-        this.client.on(Events.MessageCreate, async message => {
-            if (message.author.bot) return;
-
-            message = await message.fetch();
-
-            for (const embed of message.embeds) {
-                if (!embed.url) continue;
-
-                const url = new URL(embed.url);
-                if (url.host !== "github.com") continue;
-
-                // eg.: embed.url: "https://github.com/SerenityOS/serenity/blob/master/AK/AllOf.h"
-                //      url.pathname: "/SerenityOS/serenity/blob/master/AK/AllOf.h"
-                //      segments: ["", "SerenityOS", "serenity", "blob", "master", "AK", "AllOf.h"]
-                //      githubUrlType: "blob"
-                const segments = url.pathname.split("/");
-                const githubUrlType: string | undefined = segments[3];
-                if (githubUrlType === "tree" || githubUrlType === "blob") {
-                    await message.suppressEmbeds();
-                    return;
-                }
-            }
-        });
 
         this.state = BuggieState.Initialized;
     }

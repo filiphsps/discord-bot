@@ -5,3 +5,4 @@
  */
 
 export * from "./commandHandler";
+export * from "./serviceHandler";
