@@ -5,26 +5,29 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-import * as Commands from "./commands";
+import * as Commands from "../commands";
 
 import {
     ApplicationCommandType,
     ButtonInteraction,
     Client,
     CommandInteraction,
+    Events,
     Interaction,
     SelectMenuInteraction,
 } from "discord.js";
 
-import Command from "./commands/command";
-import { GUILD_ID } from "./config/secrets";
-import config from "./config/botConfig";
+import Command from "../commands/command";
+import { GUILD_ID } from "../config/secrets";
+import Handler from "./handler";
+import config from "../config/botConfig";
 
-export default class CommandHandler {
-    private readonly commands: Map<string[], Command>;
-    private readonly help: string;
+export class CommandHandler extends Handler {
+    private commands: Map<string[], Command>;
+    private help: string;
 
-    constructor(private readonly production: boolean) {
+    constructor() {
+        super();
         const availableCommands = new Array<string>();
 
         this.commands = new Map(
@@ -43,7 +46,22 @@ export default class CommandHandler {
         this.help = "Available commands:\n" + availableCommands.join("\n");
     }
 
-    async registerInteractions(client: Client): Promise<void> {
+    override async initialize({ client }: { client: Client }) {
+        client.once(Events.ClientReady, () => this.registerInteractions(client));
+        client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+            console.log("!!!");
+            if (interaction.user.bot) return;
+
+            if (interaction.isCommand() || interaction.isContextMenuCommand())
+                await this.handleCommandInteraction(interaction);
+
+            if (interaction.isButton()) await this.handleButtonInteraction(interaction);
+
+            if (interaction.isSelectMenu()) await this.handleSelectInteraction(interaction);
+        });
+    }
+
+    private async registerInteractions(client: Client): Promise<void> {
         const commands = [
             ...Array.from(this.commands.values())
                 .map(command => command.data())
@@ -66,8 +84,8 @@ export default class CommandHandler {
     }
 
     /** Executes user commands contained in a message if appropriate. */
-    async handleCommandInteraction(interaction: Interaction): Promise<void> {
-        if (!this.production) {
+    private async handleCommandInteraction(interaction: Interaction): Promise<void> {
+        if (!config.production) {
             const msg = `Buggie bot received ${JSON.stringify(
                 interaction,
                 (_, v) => (typeof v === "bigint" ? `${v.toString()}n` : v),
@@ -130,7 +148,7 @@ export default class CommandHandler {
         );
     }
 
-    async handleSelectInteraction(interaction: SelectMenuInteraction): Promise<void> {
+    private async handleSelectInteraction(interaction: SelectMenuInteraction): Promise<void> {
         let matchedCommand;
 
         for (const [names, command] of this.commands.entries()) {
@@ -161,7 +179,7 @@ export default class CommandHandler {
         throw new Error(`${matchedCommand.constructor.name}: Missing handleSelectMenu handler`);
     }
 
-    async handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
+    private async handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
         for (const [, command] of this.commands.entries()) {
             if (!command.buttonData) continue;
 
