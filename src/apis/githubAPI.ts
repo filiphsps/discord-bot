@@ -31,6 +31,7 @@ export interface Fortune {
 export interface Repository {
     owner: string;
     name: string;
+    branch?: string;
 }
 
 export interface Commit {
@@ -193,6 +194,22 @@ class GithubAPI {
         }
     }
 
+    async getCommit(hash: string, repository: Repository = SERENITY_REPOSITORY) {
+        try {
+            const results = await this.octokit.request("GET /repos/{owner}/{repo}/commits/{ref}", {
+                ref: hash,
+                owner: repository.owner,
+                repo: repository.name,
+                per_page: 0,
+            });
+
+            return results.data;
+        } catch (e) {
+            console.trace(e);
+            throw e;
+        }
+    }
+
     async fetchSerenityManpageByUrl(url: string): Promise<ManPage | undefined> {
         const pattern =
             /https:\/\/github\.com\/([\w/]*)\/blob\/master\/([\w/]*)\/man(\d)\/([\w/]*)\.md/;
@@ -300,6 +317,18 @@ class GithubAPI {
                 name: repo.name,
             }))
             .filter(({ name }) => !config.excludedRepositories.includes(name));
+    }
+
+    async fetchSerenityFile(path: string, repository: Repository = SERENITY_REPOSITORY) {
+        const result = await this.octokit.repos.getContent({
+            owner: repository.owner,
+            repo: repository.name,
+            ref: repository.branch,
+            path: path,
+        });
+
+        const data = result.data as any;
+        return Buffer.from(data.content, "base64").toString("utf8");
     }
 }
 
